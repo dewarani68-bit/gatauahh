@@ -9,6 +9,8 @@ run_worker_first = ["/api/*"]
 
 [[d1_databases]]
 binding = "DB"
+database_name = "gatauahh"
+database_id = "2f71f830-d733-442b-bec7-5b957532f12e"
 
 # Akun owner dibuat otomatis saat website pertama kali dibuka.
 # Setelah deploy, sebaiknya pindahkan password ke secret: wrangler secret put OWNER_PASS
