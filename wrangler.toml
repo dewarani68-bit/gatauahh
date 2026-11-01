@@ -1,4 +1,4 @@
-name = "yusup-vps-nat"
+name = "gatauahh"
 main = "src/worker.js"
 compatibility_date = "2025-04-01"
 
@@ -10,7 +10,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "gatauahh"
-database_id = "1shdhdha7sbjdhd"
+database_id = "1628881993661"
 
 # Akun owner dibuat otomatis saat website pertama kali dibuka.
 # Setelah deploy, sebaiknya pindahkan password ke secret: wrangler secret put OWNER_PASS
