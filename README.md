@@ -4,6 +4,7 @@ Versi website dari SC Auto Order VPS NAT (alur order diadaptasi dari SC by @iwaw
 Jalan di Cloudflare Workers + D1 (database), tanpa server/VPS.
 
 ## Fitur
+- Tampilan terang (gaya amprem.fadelsm.ai.id), menu owner berupa tombol panjang ke bawah
 - Login / daftar wajib (password minimal 4 karakter)
 - Loading 3D: Menyiapkan dashboard → Menyiapkan user → Melihat total trx → Siap......
 - Order: pilih jumlah → tekan Order → QR owner muncul otomatis → user wajib kirim bukti bayar → owner setujui → data VPS NAT otomatis masuk ke Pesanan + notifikasi
