@@ -66,6 +66,7 @@ async function boot() {
   await sleep(850); setLine("Siap", true); lightUp(5); bar(100);
   await sleep(750);
   document.title = S.status.site_name;
+  setupFx();
   render();
   $("#loader").classList.add("done");
 }
@@ -146,15 +147,42 @@ function shell() {
   api("/notifs").then((d) => { S.unread = d.unread; bellBadge.textContent = d.unread; bellBadge.hidden = !d.unread; }).catch(() => {});
   return el("div", { class: "shell" }, top, main, nav);
 }
+function tiltTo(node, e, max) {
+  const r = node.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  node.style.setProperty("--mx", (x * 100).toFixed(0) + "%"); node.style.setProperty("--my", (y * 100).toFixed(0) + "%");
+  node.style.transform = `perspective(700px) rotateX(${((.5 - y) * max).toFixed(1)}deg) rotateY(${((x - .5) * max).toFixed(1)}deg) translateZ(0)`;
+}
 function tilt(node) {
   node.classList.add("tilt");
-  node.addEventListener("pointermove", (e) => {
-    const r = node.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-    node.style.transform = `perspective(700px) rotateX(${(-y * 8).toFixed(1)}deg) rotateY(${(x * 8).toFixed(1)}deg)`;
-  });
+  node.addEventListener("pointermove", (e) => tiltTo(node, e, 10));
   const reset = () => (node.style.transform = "");
-  node.addEventListener("pointerleave", reset); node.addEventListener("pointerup", reset);
+  ["pointerleave", "pointerup", "pointercancel"].forEach((ev) => node.addEventListener(ev, reset));
   return node;
+}
+/* efek miring ringan untuk semua kartu (mouse hover & sentuh-tahan di HP) */
+let hot = null;
+function hotOff() { if (hot) { hot.style.transform = ""; hot.classList.remove("lift"); hot = null; } }
+function setupFx() {
+  const app = $("#app");
+  app.addEventListener("pointermove", (e) => {
+    const n = e.target.closest && e.target.closest(".card,.stat,.vps");
+    if (!n || n.classList.contains("tilt") || e.target.closest("input,textarea,select")) return hotOff();
+    if (hot !== n) { hotOff(); hot = n; n.classList.add("lift"); }
+    tiltTo(n, e, 6);
+  });
+  ["pointerleave", "pointerup", "pointercancel"].forEach((ev) => app.addEventListener(ev, hotOff));
+  /* background kubus melayang + parallax mouse / gyro HP */
+  const bg = el("div", { id: "bg3d" }), w = el("div", { class: "bgw" });
+  const spots = [[6, 12, 46, 18], [82, 8, 34, 22], [70, 38, 58, 26], [12, 48, 30, 20], [88, 66, 42, 17], [30, 78, 54, 24], [55, 90, 28, 21], [4, 84, 36, 19]];
+  spots.forEach(([x, y, s, d], i) => {
+    const c = el("div", { class: "cube" + (i % 3 === 0 ? " alt" : ""), style: `--x:${x}%;--y:${y}%;--s:${s}px;--d:${d}s;--z:${(i % 4) * 30 - 40}px;animation-delay:-${i * 3}s` });
+    for (let f = 0; f < 6; f++) c.append(el("b"));
+    w.append(c);
+  });
+  bg.append(w); document.body.prepend(bg);
+  const move = (px, py) => (w.style.transform = `rotateY(${(px * 8).toFixed(1)}deg) rotateX(${(-py * 8).toFixed(1)}deg)`);
+  window.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") move(e.clientX / innerWidth - .5, e.clientY / innerHeight - .5); });
+  window.addEventListener("deviceorientation", (e) => { if (e.gamma != null) move(Math.max(-30, Math.min(30, e.gamma)) / 60, Math.max(-30, Math.min(30, (e.beta || 45) - 45)) / 60); });
 }
 function compress(file, max, q0) {
   return new Promise((res, rej) => {
@@ -218,12 +246,16 @@ async function homeView(main) {
     catch (e) { btn.disabled = false; throw e; }
   });
   main.append(
-    tilt(el("section", { class: "card hero" }, el("h1", {}, shop.product), el("div", { class: "spec" }, shop.spec), el("div", { class: "muted" }, shop.provider),
+    tilt(el("section", { class: "card hero" }, heroRack(), el("h1", {}, shop.product), el("div", { class: "spec" }, shop.spec), el("div", { class: "muted" }, shop.provider),
       el("div", { class: "row", style: "margin-top:8px" }, el("span", { class: "price grow" }, rp(shop.price)), el("span", { class: "pill " + (shop.stock ? "ok" : "bad") }, shop.stock ? `Stok ${shop.stock}` : "Stok habis")))),
     el("section", { class: "card stack", style: "margin-top:14px" },
       el("div", { class: "row" }, el("span", { class: "grow" }, "Jumlah VPS"), el("div", { class: "stepper" }, el("button", { "aria-label": "Kurangi", on: { click: () => step(-1) } }, "−"), out, el("button", { "aria-label": "Tambah", on: { click: () => step(1) } }, "+"))),
       pin, discRow, el("div", { class: "total" }, el("span", { class: "muted" }, "Total bayar"), subEl), btn),
     el("p", { class: "foot", style: "margin-top:16px" }, "Setelah Order, QR pembayaran muncul. Kirim bukti bayar di halaman yang sama, lalu tunggu owner menyetujui. Alur order diadaptasi dari SC Auto Order VPS NAT by @iwawv1."));
+}
+function heroRack() {
+  const r = el("div", { class: "rack" }); buildRack(r, 5); r.querySelectorAll(".slab").forEach((s) => s.classList.add("on"));
+  return el("div", { class: "hero3d" }, r);
 }
 function payPanel(main, o, shop) {
   const file = el("input", { type: "file", accept: "image/*" }), prev = el("img", { class: "preview", hidden: true, alt: "Pratinjau bukti" });
@@ -310,10 +342,10 @@ async function notifView(main) {
 
 /* ---------- owner ---------- */
 function ownerView(main) {
-  const subs = [["sum", "Ringkasan"], ["ord", "Order"], ["stok", "Stok"], ["set", "Pengaturan"], ["usr", "User"], ["bc", "Broadcast"], ["promo", "Promo"]];
+  const subs = [["sum", "Ringkasan"], ["ord", "Order"], ["stok", "Stok"], ["cvps", "Create VPS NAT"], ["set", "Pengaturan"], ["usr", "User"], ["bc", "Broadcast"], ["promo", "Promo"]];
   const body = el("div");
   main.append(el("div", { class: "sub-tabs" }, subs.map(([k, l]) => el("button", { class: S.otab === k ? "on" : "", on: { click: () => { S.otab = k; render(); } } }, l))), body);
-  ({ sum: oSum, ord: oOrd, stok: oStok, set: oSet, usr: oUsr, bc: oBc, promo: oPromo })[S.otab](body);
+  ({ sum: oSum, ord: oOrd, stok: oStok, cvps: oCreate, set: oSet, usr: oUsr, bc: oBc, promo: oPromo })[S.otab](body);
 }
 async function oSum(b) {
   const d = await api("/owner/overview").catch(() => null); if (!d) return;
@@ -353,6 +385,87 @@ async function oStok(b) {
   b.append(el("div", { class: "card stack" }, el("h3", {}, "Tambah stok VPS NAT"), ta,
     el("button", { class: "btn block", on: { click: guard(async () => { const d = await api("/owner/stok", { method: "POST", body: { data: ta.value } }); toast(d.added + " VPS ditambahkan"); ta.value = ""; load(); }) } }, "Tambah ke stok")), el("div", { style: "height:14px" }), info, list);
   load();
+}
+
+/* ---------- create VPS NAT via Railway ---------- */
+const fmtDur = (ms) => (ms < 1000 ? ms + " ms" : (ms / 1000).toFixed(1) + " dtk");
+const clock = (t) => new Date(t).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+function oCreate(b) {
+  const token = el("input", { type: "password", placeholder: "Tempel token Railway", autocomplete: "off", maxLength: 200 });
+  const name = el("input", { placeholder: "Nama VPS, contoh: nat-001", maxLength: 40 });
+  const image = el("input", { value: "linuxserver/openssh-server:latest", maxLength: 120 });
+  const port = el("input", { type: "number", value: "2222", min: 1, max: 65535 });
+  const vuser = el("input", { value: "yusup", maxLength: 30 });
+  const ws = el("input", { placeholder: "Kosongkan jika token akun pribadi", maxLength: 64 });
+  const go = el("button", { class: "btn block" }, "Buat VPS NAT sekarang");
+  const live = el("div", { class: "runbox", hidden: true });
+  const STEPS = [["auth", "Validasi token Railway"], ["project", "Membuat project"], ["service", "Membuat service & deploy"], ["proxy", "Membuat alamat SSH (TCP proxy)"], ["wait", "Menunggu server aktif"], ["save", "Menyimpan ke stok"]];
+  let running = false;
+
+  const run = async () => {
+    if (running) return;
+    if (!token.value.trim() || !name.value.trim()) return toast("Token dan nama VPS wajib diisi", true);
+    running = true; go.disabled = true; go.textContent = "Sedang diproses...";
+    live.hidden = false; live.textContent = "";
+    const t0 = Date.now();
+    const clockEl = el("b", {}, "0.0 dtk");
+    const tick = setInterval(() => (clockEl.textContent = fmtDur(Date.now() - t0)), 100);
+    const head = el("div", { class: "run-head" }, el("span", { class: "pill warn" }, "Berjalan"), el("span", { class: "muted" }, "Mulai " + clock(t0)), el("span", { class: "grow" }), el("span", { class: "muted" }, "Durasi "), clockEl);
+    const bar = el("i"), barWrap = el("div", { class: "run-bar" }, bar);
+    const rows = STEPS.map(([k, l]) => ({ k, l, row: el("div", { class: "st wait" }, el("span", { class: "dot" }), el("div", { class: "st-b" }, el("div", { class: "st-t" }, l), el("small", { class: "muted" }, "Menunggu")), el("small", { class: "st-time" })) }));
+    const timeline = el("div", { class: "timeline" }, rows.map((r) => r.row));
+    live.append(head, barWrap, timeline);
+    const mark = (i, cls, msg, t) => { const r = rows[i].row; r.className = "st " + cls; r.querySelector("small.muted").textContent = msg; if (t != null) r.querySelector(".st-time").textContent = t; bar.style.width = Math.round(((cls === "ok" ? i + 1 : i + .4) / STEPS.length) * 100) + "%"; };
+    const call = (step, extra) => api("/owner/railway", { method: "POST", body: { token: token.value.trim(), step, ...extra } });
+    const ctx = { name: name.value.trim() };
+    let failedAt = -1, result = null;
+    try {
+      for (let i = 0; i < STEPS.length; i++) {
+        const [k] = STEPS[i]; const s0 = Date.now();
+        failedAt = i; mark(i, "run", "Sedang berjalan...", clock(s0));
+        let d;
+        if (k === "wait") {
+          const limit = Date.now() + 4 * 60e3;
+          for (;;) {
+            d = await call("wait", ctx);
+            mark(i, "run", "Status Railway: " + d.status, clock(s0));
+            if (d.done) break;
+            if (Date.now() > limit) throw new Error("Timeout: deploy belum selesai setelah 4 menit");
+            await sleep(4000);
+          }
+        } else {
+          d = await call(k, k === "auth" ? {} : k === "project" ? { name: ctx.name, workspace: ws.value.trim() || undefined } : k === "service" ? { ...ctx, image: image.value.trim(), vuser: vuser.value.trim() } : k === "proxy" ? { ...ctx, port: port.value } : { ...ctx, host: ctx.host, port: ctx.port, vuser: ctx.vuser, vpass: ctx.vpass });
+          for (const key of ["projectId", "environmentId", "serviceId", "vuser", "vpass", "host"]) if (d[key]) ctx[key] = d[key];
+          if (k === "proxy") ctx.port = d.port;
+        }
+        mark(i, "ok", d.label || "Selesai", fmtDur(Date.now() - s0));
+        failedAt = -1;
+      }
+      result = { host: ctx.host, port: ctx.port, user: ctx.vuser, pass: ctx.vpass };
+    } catch (e) {
+      if (failedAt >= 0) mark(failedAt, "bad", e.message, fmtDur(Date.now() - t0));
+      head.firstChild.className = "pill bad"; head.firstChild.textContent = "Gagal";
+      live.append(el("p", { class: "err" }, "Proses berhenti di langkah \"" + (STEPS[failedAt] ? STEPS[failedAt][1] : "?") + "\". " + e.message),
+        el("p", { class: "muted" }, "Jika project sudah terbuat di Railway, hapus manual dari dashboard Railway supaya tidak terpakai kuota."));
+    } finally {
+      clearInterval(tick); clockEl.textContent = fmtDur(Date.now() - t0);
+      running = false; go.disabled = false; go.textContent = "Buat VPS NAT sekarang";
+    }
+    if (result) {
+      head.firstChild.className = "pill ok"; head.firstChild.textContent = "Berhasil";
+      bar.style.width = "100%";
+      live.append(vpsCard({ ip: result.host, port: result.port, user: result.user, pass: result.pass }, 0));
+      toast("VPS NAT dibuat & masuk stok 🎉"); name.value = "";
+    }
+  };
+  go.onclick = guard(run);
+  b.append(el("div", { class: "card stack" }, el("h3", {}, "Create VPS NAT (Railway)"),
+    el("p", { class: "muted" }, "Tempel token Railway, isi nama VPS, lalu tekan tombol. Server dibuat otomatis dan langsung masuk ke Stok. Token tidak disimpan."),
+    el("label", {}, "Token Railway"), token, el("label", {}, "Nama VPS"), name,
+    el("details", { class: "adv" }, el("summary", {}, "Pengaturan lanjutan"),
+      el("label", {}, "Docker image (harus berisi SSH server)"), image, el("label", {}, "Port SSH di dalam container"), port,
+      el("label", {}, "Username SSH"), vuser, el("label", {}, "Workspace ID (opsional)"), ws),
+    go), el("div", { style: "height:14px" }), live);
 }
 async function oSet(b) {
   const d = await api("/owner/overview").catch(() => null); if (!d) return; const s = d.settings;
