@@ -10,7 +10,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "yusup-vps-nat"
-database_id = "ISI_DATABASE_ID_DARI_WRANGLER_D1_CREATE"
+database_id = "1shdhdha7sbjdhd"
 
 # Akun owner dibuat otomatis saat website pertama kali dibuka.
 # Setelah deploy, sebaiknya pindahkan password ke secret: wrangler secret put OWNER_PASS
