@@ -12,6 +12,15 @@ Jalan di Cloudflare Workers + D1 (database), tanpa server/VPS.
 - Notifikasi + broadcast dari owner
 - Owner saja: setting QR, setujui/tolak order, tambah/hapus stok VPS NAT, ban/unban user, kirim notif ke 1 user / semua, kode promo, harga & spesifikasi, mode maintenance
 
+## Create VPS NAT otomatis (Railway) — khusus owner
+Owner → tab **Create VPS NAT** → tempel token Railway → isi nama VPS → tekan tombol.
+Proses tampil sebagai timeline dengan jam, durasi tiap langkah, dan status berhasil/gagal:
+validasi token → buat project → buat service + deploy → buat alamat SSH (TCP proxy) → tunggu server aktif → simpan ke stok.
+- Token tidak disimpan; hanya dipakai selama proses berjalan.
+- Default image `linuxserver/openssh-server` (SSH di port 2222, login user + password acak). Bisa diganti di "Pengaturan lanjutan".
+- Pakai token akun (railway.com/account/tokens). Token workspace/team: isi Workspace ID.
+- Cek aturan penggunaan (ToS) Railway untuk layanan SSH sebelum dijual.
+
 ## Akun owner
 Dibuat otomatis saat website pertama dibuka (dari `[vars]` di wrangler.toml):
 username `Yusupboy`, password `memeksiapaitu`. Username ini tidak bisa didaftarkan orang lain.
