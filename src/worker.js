@@ -189,6 +189,85 @@ const orderOut = (o) => ({
   delivered: o.status === "approved" && o.delivered ? JSON.parse(o.delivered) : null,
 });
 
+
+/* ---------- Railway (create VPS NAT otomatis) ---------- */
+const RW_URL = "https://backboard.railway.com/graphql/v2";
+async function rwGql(token, query, variables) {
+  let r;
+  try {
+    r = await fetch(RW_URL, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + token }, body: JSON.stringify({ query, variables }) });
+  } catch { fail(502, "Tidak bisa menghubungi Railway"); }
+  let d = {}; try { d = await r.json(); } catch {}
+  if (d.errors && d.errors.length) fail(400, "Railway: " + String(d.errors[0].message || "error").slice(0, 200));
+  if (!r.ok) fail(r.status === 401 || r.status === 403 ? 400 : 502, r.status === 401 || r.status === 403 ? "Token Railway tidak valid" : "Railway error " + r.status);
+  return d.data || {};
+}
+const rwId = (v, label) => { const x = String(v || ""); if (!/^[A-Za-z0-9-]{8,64}$/.test(x)) fail(400, label + " tidak valid"); return x; };
+function rwPass() {
+  const c = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "";
+  for (const b of crypto.getRandomValues(new Uint8Array(14))) s += c[b % c.length];
+  return s;
+}
+async function rwStep(db, body) {
+  const token = str(body.token, 200);
+  if (token.length < 20) fail(400, "Token Railway kosong / terlalu pendek");
+  switch (body.step) {
+    case "auth": {
+      try { const d = await rwGql(token, "query{ me{ name email } }"); return { label: "Token valid" + (d.me && d.me.name ? " (" + d.me.name + ")" : "") }; }
+      catch (e) {
+        const d = await rwGql(token, "query{ projects(first:1){ edges{ node{ id } } } }");
+        return { label: "Token valid" };
+      }
+    }
+    case "project": {
+      const name = str(body.name, 40);
+      if (!/^[A-Za-z0-9_-]{3,40}$/.test(name)) fail(400, "Nama VPS 3–40 karakter: huruf, angka, - atau _");
+      const input = { name, defaultEnvironmentName: "production" };
+      if (body.workspace) input.workspaceId = rwId(body.workspace, "Workspace ID");
+      const d = await rwGql(token, "mutation($input:ProjectCreateInput!){ projectCreate(input:$input){ id environments{ edges{ node{ id name } } } } }", { input });
+      const pr = d.projectCreate; const env = pr && pr.environments && pr.environments.edges[0] && pr.environments.edges[0].node;
+      if (!pr || !env) fail(502, "Railway tidak mengembalikan project / environment");
+      return { projectId: pr.id, environmentId: env.id, label: "Project dibuat" };
+    }
+    case "service": {
+      const projectId = rwId(body.projectId, "Project ID"), environmentId = rwId(body.environmentId, "Environment ID");
+      const image = str(body.image, 120) || "linuxserver/openssh-server:latest";
+      if (!/^[a-z0-9][a-z0-9._\/:@-]{1,119}$/i.test(image)) fail(400, "Nama image tidak valid");
+      const vuser = str(body.vuser, 30) || "yusup";
+      if (!/^[a-z][a-z0-9_-]{1,29}$/.test(vuser)) fail(400, "Username SSH tidak valid");
+      const vpass = rwPass();
+      const input = { projectId, environmentId, name: "vps-nat", source: { image }, variables: { PUID: "1000", PGID: "1000", TZ: "Asia/Jakarta", PASSWORD_ACCESS: "true", USER_NAME: vuser, USER_PASSWORD: vpass, SUDO_ACCESS: "true" } };
+      const d = await rwGql(token, "mutation($input:ServiceCreateInput!){ serviceCreate(input:$input){ id } }", { input });
+      if (!d.serviceCreate) fail(502, "Railway tidak mengembalikan service");
+      return { serviceId: d.serviceCreate.id, vuser, vpass, label: "Service & deploy dimulai" };
+    }
+    case "proxy": {
+      const environmentId = rwId(body.environmentId, "Environment ID"), serviceId = rwId(body.serviceId, "Service ID");
+      const port = int(body.port) || 2222;
+      if (port < 1 || port > 65535) fail(400, "Port tidak valid");
+      const d = await rwGql(token, "mutation($input:TCPProxyCreateInput!){ tcpProxyCreate(input:$input){ domain proxyPort } }", { input: { environmentId, serviceId, applicationPort: port } });
+      const t = d.tcpProxyCreate; if (!t || !t.domain) fail(502, "TCP proxy gagal dibuat");
+      return { host: t.domain, port: String(t.proxyPort), label: "Alamat SSH siap" };
+    }
+    case "wait": {
+      const projectId = rwId(body.projectId, "Project ID"), environmentId = rwId(body.environmentId, "Environment ID"), serviceId = rwId(body.serviceId, "Service ID");
+      const d = await rwGql(token, "query($input:DeploymentListInput!){ deployments(first:1,input:$input){ edges{ node{ id status } } } }", { input: { projectId, environmentId, serviceId } });
+      const n = d.deployments && d.deployments.edges[0] && d.deployments.edges[0].node;
+      const st = n ? n.status : "QUEUED";
+      if (["FAILED", "CRASHED", "REMOVED"].includes(st)) fail(400, "Deploy gagal di Railway (status " + st + ")");
+      return { status: st, done: st === "SUCCESS", label: st };
+    }
+    case "save": {
+      const host = str(body.host, 120), port = str(body.port, 6), vuser = str(body.vuser, 60), vpass = str(body.vpass, 200), name = str(body.name, 80);
+      if (!host || !port || !vpass) fail(400, "Data VPS belum lengkap");
+      await db.prepare("INSERT INTO stok(ip,port,vuser,vpass,hostname,raw,created_at) VALUES(?,?,?,?,?,?,?)")
+        .bind(host, port, vuser, vpass, name, "railway:" + name, Date.now()).run();
+      return { label: "Masuk ke stok" };
+    }
+  }
+  fail(400, "Langkah tidak dikenal");
+}
+
 /* ---------- main ---------- */
 export default {
   async fetch(req, env) {
@@ -485,6 +564,10 @@ async function handle(req, env) {
     return J({ ok: true });
   }
 
+  if (p === "/api/owner/railway" && m === "POST") {
+    await rateLimit(db, "rw:" + user.id, 120, 10 * 60e3);
+    return J({ ok: true, ...(await rwStep(db, body)) });
+  }
   if (p === "/api/owner/codes" && m === "GET") {
     return J({ codes: (await db.prepare("SELECT * FROM codes ORDER BY rowid DESC LIMIT 100").all()).results });
   }
