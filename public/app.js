@@ -1,7 +1,16 @@
 (() => {
 "use strict";
-const S = { status: { site_name: "Yusup VPS NAT", maintenance: false, total_trx: 0, total_users: 0 }, me: null, banned: null, tab: "home", otab: "sum", ownerLogin: false, timers: [], unread: 0 };
+const S = { status: { site_name: "Yusup VPS NAT", maintenance: false, total_trx: 0, total_users: 0 }, me: null, banned: null, tab: "home", otab: null, ownerLogin: false, timers: [], unread: 0 };
 const $ = (s) => document.querySelector(s);
+const SV = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  home: SV('<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'),
+  orders: SV('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>'),
+  chat: SV('<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>'),
+  owner: SV('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  chev: SV('<path d="m9 6 6 6-6 6"/>'),
+  logo: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="currentColor"/><rect x="7" y="9" width="18" height="6" rx="2" fill="none" stroke="#fff" stroke-width="1.7"/><rect x="7" y="17" width="18" height="6" rx="2" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="11" cy="12" r="1" fill="#fff"/><circle cx="11" cy="20" r="1" fill="#fff"/></svg>',
+};
 const el = (t, p = {}, ...k) => {
   const n = document.createElement(t);
   for (const [a, v] of Object.entries(p)) {
@@ -118,7 +127,7 @@ function authView() {
   go.onclick = submit;
   p.addEventListener("keydown", (e) => e.key === "Enter" && submit());
   const rack = el("div", { class: "rack" }); buildRack(rack, 4); rack.querySelectorAll(".slab").forEach((s) => s.classList.add("on"));
-  return el("div", { class: "auth" }, el("div", { class: "float3d" }, rack),
+  return el("div", { class: "auth" }, el("div", { class: "auth-logo", innerHTML: ICONS.logo }),
     el("h1", {}, S.status.site_name), el("p", { class: "sub" }, "Beli VPS NAT, bayar lewat QR, terima datanya otomatis setelah disetujui."),
     el("div", { class: "tabs" }, tl, tr), el("label", {}, "Username"), u, el("label", {}, "Password"), p, err, go);
 }
@@ -131,11 +140,11 @@ function shell() {
   if (isOwner) tabs.push(["owner", "🛠️", "Owner"]);
   const bellBadge = el("b", { hidden: !S.unread }, S.unread);
   const bell = el("button", { class: "bell", "aria-label": "Notifikasi", on: { click: () => go("notif") } }, "🔔", bellBadge);
-  const nav = el("nav", { class: "bar" }, tabs.map(([k, ic, lb]) => el("button", { class: S.tab === k ? "on" : "", on: { click: () => go(k) } }, el("span", {}, ic), lb)));
-  const top = el("header", { class: "top" }, el("h2", { class: "grow" }, S.status.site_name),
+  const nav = el("nav", { class: "bar" }, tabs.map(([k, ic, lb]) => el("button", { class: S.tab === k ? "on" : "", on: { click: () => go(k) } }, el("span", { innerHTML: ICONS[k] || ic }), lb)));
+  const top = el("header", { class: "top" }, el("span", { class: "logo", innerHTML: ICONS.logo }), el("h2", { class: "grow" }, S.status.site_name),
     el("span", { class: "pill" }, (isOwner ? "Owner · " : "") + S.me.username), bell,
     el("button", { class: "btn ghost sm", on: { click: logout } }, "Keluar"));
-  function go(t) { S.tab = t; render(); }
+  function go(t) { if (t === "owner" && S.tab === "owner") S.otab = null; S.tab = t; render(); }
   const views = { home: homeView, orders: ordersView, chat: chatView, notif: notifView, owner: ownerView };
   clearTimers();
   views[S.tab](main);
@@ -152,17 +161,12 @@ function tiltTo(node, e, max) {
   node.style.setProperty("--mx", (x * 100).toFixed(0) + "%"); node.style.setProperty("--my", (y * 100).toFixed(0) + "%");
   node.style.transform = `perspective(700px) rotateX(${((.5 - y) * max).toFixed(1)}deg) rotateY(${((x - .5) * max).toFixed(1)}deg) translateZ(0)`;
 }
-function tilt(node) {
-  node.classList.add("tilt");
-  node.addEventListener("pointermove", (e) => tiltTo(node, e, 10));
-  const reset = () => (node.style.transform = "");
-  ["pointerleave", "pointerup", "pointercancel"].forEach((ev) => node.addEventListener(ev, reset));
-  return node;
-}
+function tilt(node) { return node; }
 /* efek miring ringan untuk semua kartu (mouse hover & sentuh-tahan di HP) */
 let hot = null;
 function hotOff() { if (hot) { hot.style.transform = ""; hot.classList.remove("lift"); hot = null; } }
 function setupFx() {
+  return;
   const app = $("#app");
   app.addEventListener("pointermove", (e) => {
     const n = e.target.closest && e.target.closest(".card,.stat,.vps");
@@ -342,10 +346,18 @@ async function notifView(main) {
 
 /* ---------- owner ---------- */
 function ownerView(main) {
-  const subs = [["sum", "Ringkasan"], ["ord", "Order"], ["stok", "Stok"], ["cvps", "Create VPS NAT"], ["set", "Pengaturan"], ["usr", "User"], ["bc", "Broadcast"], ["promo", "Promo"]];
+  const subs = [["sum", "Ringkasan", "Statistik toko dan status"], ["cvps", "Create VPS NAT", "Buat server otomatis via Railway"], ["ord", "Order", "Setujui atau tolak pembayaran"], ["stok", "Stok", "Tambah dan hapus data VPS"], ["set", "Pengaturan", "QR, harga, spesifikasi, maintenance"], ["usr", "User", "Ban atau unban pengguna"], ["bc", "Broadcast", "Kirim notifikasi ke user"], ["promo", "Promo", "Kode diskon"]];
+  const fns = { sum: oSum, cvps: oCreate, ord: oOrd, stok: oStok, set: oSet, usr: oUsr, bc: oBc, promo: oPromo };
+  if (!S.otab || !fns[S.otab]) {
+    main.append(el("p", { class: "eyebrow" }, "PANEL OWNER"), el("h2", { class: "page-title", style: "margin-top:0" }, "Menu Owner"),
+      el("div", { class: "menu-list" }, subs.map(([k, l, d], i) => el("button", { class: "menu-btn" + (k === "cvps" ? " primary" : ""), on: { click: () => { S.otab = k; render(); } } },
+        el("span", { class: "num" }, String(i + 1).padStart(2, "0")), el("span", { class: "mb" }, el("b", {}, l), el("small", {}, d)), el("span", { class: "chev", innerHTML: ICONS.chev })))));
+    return;
+  }
+  const cur = subs.find((x) => x[0] === S.otab);
   const body = el("div");
-  main.append(el("div", { class: "sub-tabs" }, subs.map(([k, l]) => el("button", { class: S.otab === k ? "on" : "", on: { click: () => { S.otab = k; render(); } } }, l))), body);
-  ({ sum: oSum, ord: oOrd, stok: oStok, cvps: oCreate, set: oSet, usr: oUsr, bc: oBc, promo: oPromo })[S.otab](body);
+  main.append(el("button", { class: "btn ghost block", on: { click: () => { S.otab = null; render(); } } }, "← Menu Owner"), el("h2", { class: "page-title" }, cur[1]), body);
+  fns[S.otab](body);
 }
 async function oSum(b) {
   const d = await api("/owner/overview").catch(() => null); if (!d) return;
@@ -353,6 +365,7 @@ async function oSum(b) {
   b.append(el("div", { class: "stats" }, st.map(([l, v]) => tilt(el("div", { class: "stat" }, el("b", {}, v), el("small", {}, l))))));
   if (!d.has_qr) b.append(el("p", { class: "err" }, "QR pembayaran belum diatur — user belum bisa order. Atur di tab Pengaturan."));
   if (d.settings.maintenance) b.append(el("p", { class: "pill warn", style: "margin-top:12px" }, "Mode maintenance sedang aktif"));
+  b.append(el("small", { class: "muted", style: "display:block;margin-top:14px" }, "Versi web v4 · tampilan terang · Create VPS NAT aktif"));
 }
 async function oOrd(b) {
   let f = "pending";
