@@ -1,5 +1,5 @@
 // Yusup VPS NAT — Cloudflare Worker + D1
-// Alur order diadaptasi dari SC Auto Order VPS NAT by @iwawv1
+// Auto Order VPS NAT by @yusupwoys
 
 const enc = new TextEncoder();
 const J = (d, s = 200, h = {}) =>
