@@ -255,7 +255,7 @@ async function homeView(main) {
     el("section", { class: "card stack", style: "margin-top:14px" },
       el("div", { class: "row" }, el("span", { class: "grow" }, "Jumlah VPS"), el("div", { class: "stepper" }, el("button", { "aria-label": "Kurangi", on: { click: () => step(-1) } }, "−"), out, el("button", { "aria-label": "Tambah", on: { click: () => step(1) } }, "+"))),
       pin, discRow, el("div", { class: "total" }, el("span", { class: "muted" }, "Total bayar"), subEl), btn),
-    el("p", { class: "foot", style: "margin-top:16px" }, "Setelah Order, QR pembayaran muncul. Kirim bukti bayar di halaman yang sama, lalu tunggu owner menyetujui. Alur order diadaptasi dari SC Auto Order VPS NAT by @iwawv1."));
+    el("p", { class: "foot", style: "margin-top:16px" }, "Setelah Order, QR pembayaran muncul. Kirim bukti bayar di halaman yang sama, lalu tunggu owner menyetujui. Alur order diadaptasi dari SC Auto Order VPS NAT by @dunguuuu."));
 }
 function heroRack() {
   const r = el("div", { class: "rack" }); buildRack(r, 5); r.querySelectorAll(".slab").forEach((s) => s.classList.add("on"));
