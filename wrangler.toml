@@ -1,4 +1,4 @@
-name = "yusup-vps-nat"
+name = "gatauahh"
 main = "src/worker.js"
 compatibility_date = "2025-04-01"
 
@@ -9,7 +9,7 @@ run_worker_first = ["/api/*"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "yusup-vps-nat"
+database_name = "gatauahh"
 database_id = "ISI_DATABASE_ID_DARI_WRANGLER_D1_CREATE"
 
 # Akun owner dibuat otomatis saat website pertama kali dibuka.
