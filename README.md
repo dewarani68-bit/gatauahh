@@ -1,6 +1,6 @@
 # Yusup VPS NAT — Website Cloudflare
 
-Versi website dari SC Auto Order VPS NAT (alur order diadaptasi dari SC by @iwawv1 — credit tetap dipertahankan).
+Auto Order VPS NAT by @yusupwoys.
 Jalan di Cloudflare Workers + D1 (database), tanpa server/VPS.
 
 ## Fitur
